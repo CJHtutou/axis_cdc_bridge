@@ -53,13 +53,22 @@ async def init_dut(dut):
     dut.m_axis_tready.value = 0
     dut.aresetn_m.value = 0
     dut.aresetn_s.value = 0
+    dut.presetn.value = 0
+    dut.psel.value = 0
+    dut.penable.value = 0
+    dut.pwrite.value = 0
+    dut.paddr.value = 0
+    dut.pwdata.value = 0
+    dut.pstrb.value = 0
 
     cocotb.start_soon(Clock(dut.aclk_m, MCLK_NS, unit="ns").start())
     cocotb.start_soon(Clock(dut.aclk_s, SCLK_NS, unit="ns").start())
+    cocotb.start_soon(Clock(dut.pclk, 20, unit="ns").start())
 
     await Timer(5 * max(MCLK_NS, SCLK_NS), unit="ns")
     dut.aresetn_m.value = 1
     dut.aresetn_s.value = 1
+    dut.presetn.value = 1
     await Timer(2 * max(MCLK_NS, SCLK_NS), unit="ns")
 
 

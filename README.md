@@ -15,9 +15,11 @@ AXI4-Stream 跨时钟域（CDC）异步桥接 IP + cocotb 验证平台（v0.1 sk
 | 双时钟随机反压、跨时钟域数据完整性 | ✅ 3 种频比 100% 通过 |
 | 突变测试（受控缺陷注入） | ✅ 2/2 检出 |
 | Yosys 综合与面积统计 | ✅ 1502 cells（默认 32bit / 深度 16） |
-| APB3 配置寄存器（CTRL/THRESH/STATUS/…） | ⏳ v0.2 |
-| Packet 整包转发模式、奇偶校验、覆盖率收集 | ⏳ v0.2 |
-| SpyGlass CDC / SDC 约束 | ⏳ v0.3 |
+| APB3 配置寄存器（6 个，含 pslverr / W1C / pstrb） | ✅ v0.2 |
+| 运行时可编程水位阈值（AF/AE） | ✅ v0.2 |
+| 跨时钟域事件计数（包计数、溢出计数，格雷码） | ✅ v0.2 |
+| Packet 整包转发模式、奇偶校验、覆盖率收集 | ⏳ v0.3 |
+| SpyGlass CDC / SDC 约束 | ⏳ v0.4 |
 
 ## 目录结构
 
@@ -47,6 +49,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 make sim          # 冒烟仿真，生成 dump.fst 波形
+make apb          # APB3 寄存器 / RO 保护 / W1C / 计数器测试
 make perf         # 10 万拍吞吐压测
 make regression   # 3 种频比 × 100 包
 make mutations    # 受控缺陷注入
@@ -66,12 +69,27 @@ make synth        # Yosys 综合 → reports/yosys_stat.txt
 5. **突变测试**：`BUG_2_EMPTY_CMP` / `BUG_3_FULL_COND` 必须被 testbench 100% 检出，
    用来证明 Scoreboard 与断言不是"漏报空壳"。
 
+## APB3 寄存器映射
+
+| 地址 | 名称 | 权限 | 说明 |
+|---|---|---|---|
+| 0x00 | `CTRL` | R/W | [0] 全局使能（复位=1），[1] 模式，[2] 奇偶校验，[3] 软复位脉冲 |
+| 0x04 | `THRESH` | R/W | [7:0] almost_full 阈值，[15:8] almost_empty 阈值 |
+| 0x08 | `STATUS` | RO | [0] full，[1] empty，[2] almost_full，[3] almost_empty，[15:8] 水位 |
+| 0x0C | `PKT_CNT` | RO | 已完成（含 TLAST）的包计数，格雷码跨域同步 |
+| 0x10 | `ERR_CNT` | RO/W1C | [15:0] 奇偶错误（v0.3），[31:16] 满状态写尝试次数 |
+| 0x14 | `IRQ_MASK` | R/W | [0..3] 对应中断源屏蔽，`irq_out` 为电平输出 |
+
+非法地址访问、或对只读寄存器写入，`pslverr` 在 ACCESS 周期拉高（零等待 `pready`）。
+写操作支持 `pstrb` 字节选通。
+
 ## 已知限制（诚实声明）
 
 - `BUG_1_BIN_SYNC`（二进制指针直接跨域）在**零延迟 RTL 仿真中不可观测**：
   Verilator 中所有比特在同一 delta 周期更新，不会产生总线偏斜。
   该缺陷需要 SDF 反标或 SpyGlass CDC 结构检查才能捕获，因此未纳入突变矩阵。
-- 当前未做 APB3、覆盖率收集、形式化与 STA；v0.2/v0.3 补齐。
+- 当前未做 Packet 整包转发、奇偶校验、覆盖率收集、形式化与 STA（v0.3/v0.4）。
+- `CTRL[1]`（模式）与 `CTRL[2]`（奇偶校验）已接入寄存器，但数据面尚未实现对应功能。
 - 综合结果基于 Yosys 通用 CMOS 映射，仅用于相对面积对比，不代表商业工艺流片面积。
 
 ## License

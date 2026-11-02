@@ -4,10 +4,10 @@
 
 module async_fifo_core #(
     parameter int DATA_W = 32,
-    parameter int DEPTH  = 16,               // must be a power of two
-    parameter int AF_TH  = (DEPTH > 4) ? (DEPTH - 4) : 1,
-    parameter int AE_TH  = 1
+    parameter int DEPTH  = 16                // must be a power of two
 ) (
+    input  logic [7:0]        af_th,          // runtime almost-full threshold
+    input  logic [7:0]        ae_th,          // runtime almost-empty threshold
     input  logic              wclk,
     input  logic              wrst_n,
     input  logic              wr_en,
@@ -20,13 +20,12 @@ module async_fifo_core #(
     input  logic              rd_en,
     output logic [DATA_W-1:0] rdata,
     output logic              rempty,
-    output logic              ralmost_empty
+    output logic              ralmost_empty,
+    output logic [$clog2(DEPTH):0] wlevel_o
 );
     localparam int AW = $clog2(DEPTH);
     localparam int PW = AW + 1;
 
-    localparam logic [PW-1:0] AF_TH_V = AF_TH;
-    localparam logic [PW-1:0] AE_TH_V = AE_TH;
 
     logic [DATA_W-1:0] mem [0:DEPTH-1];
 
@@ -142,8 +141,9 @@ module async_fifo_core #(
     assign wlevel = wbin - rbin_sync_w;
     assign rlevel = rbin - wbin_sync_r;
 
-    assign walmost_full  = (wlevel >= AF_TH_V);
-    assign ralmost_empty = (rlevel <= AE_TH_V);
+    assign walmost_full  = (wlevel >= af_th[PW-1:0]);
+    assign ralmost_empty = (rlevel <= ae_th[PW-1:0]);
+    assign wlevel_o      = wlevel;
 endmodule
 
 `default_nettype wire

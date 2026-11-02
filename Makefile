@@ -15,8 +15,10 @@ TESTCASE      ?= test_smoke
 RTL_DIR := rtl
 
 VERILOG_SOURCES := $(RTL_DIR)/cdc_sync_2ff.sv \
+                   $(RTL_DIR)/cdc_gray_counter.sv \
                    $(RTL_DIR)/async_fifo_core.sv \
                    $(RTL_DIR)/axis_skid_buffer.sv \
+                   $(RTL_DIR)/apb3_csr_regs.sv \
                    $(RTL_DIR)/axis_cdc_bridge_top.sv
 
 COMPILE_ARGS += --timing -Wno-fatal -Wno-lint
@@ -41,6 +43,9 @@ regression:
 	$(PYTHON) scripts/run_regression.py
 endif
 
+apb:
+	$(MAKE) MODULE=test_apb TESTCASE= WAVES=0 SIM_BUILD=sim_build_apb sim
+
 mutations:
 	$(PYTHON) scripts/run_mutations.py
 
@@ -49,7 +54,7 @@ perf:
 
 synth:
 	mkdir -p reports
-	yosys -p "read_verilog -sv $(RTL_DIR)/cdc_sync_2ff.sv $(RTL_DIR)/async_fifo_core.sv $(RTL_DIR)/axis_skid_buffer.sv $(RTL_DIR)/axis_cdc_bridge_top.sv; hierarchy -check -top axis_cdc_bridge_top; synth -top axis_cdc_bridge_top; stat" > reports/yosys_stat.txt 2>&1 || (tail -20 reports/yosys_stat.txt; exit 1); cat reports/yosys_stat.txt
+	yosys -p "read_verilog -sv $(VERILOG_SOURCES); hierarchy -check -top axis_cdc_bridge_top; synth -top axis_cdc_bridge_top; stat" > reports/yosys_stat.txt 2>&1 || (tail -20 reports/yosys_stat.txt; exit 1); cat reports/yosys_stat.txt
 
 lint:
 	verilator --lint-only -Wall --top-module axis_cdc_bridge_top $(RTL_DIR)/*.sv
