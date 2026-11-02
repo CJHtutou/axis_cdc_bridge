@@ -1,0 +1,77 @@
+name: regression
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  sim:
+    runs-on: ubuntu-24.04
+    env:
+      VERILATOR_VERSION: v5.036
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache Verilator
+        id: cache-verilator
+        uses: actions/cache@v4
+        with:
+          path: ~/verilator
+          key: verilator-${{ env.VERILATOR_VERSION }}-${{ runner.os }}
+
+      - name: Build Verilator ${{ env.VERILATOR_VERSION }}
+        if: steps.cache-verilator.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential autoconf flex bison help2man libfl-dev zlib1g-dev
+          curl -fsSL -o /tmp/vlt.tar.gz \
+            "https://github.com/verilator/verilator/archive/refs/tags/${VERILATOR_VERSION}.tar.gz"
+          tar xzf /tmp/vlt.tar.gz -C /tmp
+          cd "/tmp/verilator-${VERILATOR_VERSION#v}"
+          autoconf
+          ./configure --prefix="$HOME/verilator"
+          make -j"$(nproc)"
+          make install
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Smoke test (with waves)
+        run: |
+          export PATH="$HOME/verilator/bin:$PATH"
+          make sim
+
+      - name: Regression (3 clock ratios)
+        run: |
+          export PATH="$HOME/verilator/bin:$PATH"
+          make regression
+
+      - name: Mutation testing
+        run: |
+          export PATH="$HOME/verilator/bin:$PATH"
+          make mutations
+
+      - name: Synthesis (Yosys)
+        run: |
+          sudo apt-get install -y yosys
+          export PATH="$HOME/verilator/bin:$PATH"
+          make synth
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            reports/
+            dump.fst
+            results.xml
+          if-no-files-found: warn

@@ -1,0 +1,6 @@
+# axis_cdc_bridge verification stack
+# Python >= 3.10 (tested on 3.14 with Verilator 5.036)
+cocotb==2.1.0
+pyuvm==5.0.0
+pytest==9.2.0
+matplotlib==3.11.2

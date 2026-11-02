@@ -1,0 +1,13 @@
+sim_build/
+__pycache__/
+*.pyc
+results.xml
+*.fst
+*.vcd
+.venv/
+reports/*.png
+reports/*.json
+reports/*.csv
+reports/*.txt
+sim_build_*/
+obj_dir/
