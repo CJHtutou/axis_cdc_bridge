@@ -2,7 +2,7 @@
 # usage: make sim | make perf | make regression | make mutations | make synth | make lint
 SHELL := /bin/bash
 
-PYTHON ?= /opt/eda/bin/python
+PYTHON ?= python3
 export PATH       := /opt/eda/bin:$(PATH)
 export PYTHONPATH := $(CURDIR)/tb:$(CURDIR):$(PYTHONPATH)
 
