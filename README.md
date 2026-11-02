@@ -1,5 +1,7 @@
 # axis_cdc_bridge
 
+![regression](https://github.com/CJHtutou/axis_cdc_bridge/actions/workflows/regression_ci.yml/badge.svg)
+
 AXI4-Stream 跨时钟域（CDC）异步桥接 IP + cocotb 验证平台（v0.1 skeleton）。
 
 > 目标岗位：数字 IC 前端（RTL）/ 数字 IC 验证（DV）/ FPGA 逻辑开发。
