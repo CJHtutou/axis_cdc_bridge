@@ -14,6 +14,7 @@ module axis_cdc_bridge_top #(
     input  logic [DATA_W-1:0]   s_axis_tdata,
     input  logic [DATA_W/8-1:0] s_axis_tkeep,
     input  logic                s_axis_tlast,
+    input  logic                s_axis_tuser,   // expected parity of {tdata,tkeep}
     // slave-side (read) domain
     input  logic                aclk_s,
     input  logic                aresetn_s,
@@ -53,13 +54,26 @@ module axis_cdc_bridge_top #(
     // pclk-domain status
     logic               st_full, st_empty, st_af, st_ae;
     logic [7:0]         st_level;
-    logic [31:0]        pkt_cnt, ovf_cnt, err_cnt;
+    logic [31:0]        pkt_cnt, ovf_cnt, par_cnt, err_cnt;
+    logic [31:0]        w_committed_r, r_consumed;
+    logic               pkt_mode_r, parity_en_m;
+    logic               pkt_avail, parity_err;
 
     // ---------------- data plane ----------------
     assign wr_en         = s_axis_tvalid && !wfull && cfg_enable;
     assign s_axis_tready = !wfull && cfg_enable;
     assign wdata_p       = {s_axis_tlast, s_axis_tkeep, s_axis_tdata};
-    assign rd_en         = skid_ready && !rempty;
+
+    // parity: tuser carries the expected XOR of every tdata/tkeep bit
+    logic calc_par;
+    assign calc_par = ^s_axis_tdata ^ ^s_axis_tkeep;
+    assign parity_err = wr_en && parity_en_m && (s_axis_tuser != calc_par);
+
+    // packet (store-and-forward) mode: reads only start on a complete packet
+    assign pkt_avail = (w_committed_r != r_consumed);
+    logic  rd_valid;
+    assign rd_valid  = !rempty && (!pkt_mode_r || pkt_avail);
+    assign rd_en     = skid_ready && rd_valid;
 
     async_fifo_core #(
         .DATA_W (PW_DATA),
@@ -87,7 +101,7 @@ module axis_cdc_bridge_top #(
     ) u_skid (
         .clk    (aclk_s),
         .rst_n  (aresetn_s),
-        .s_valid(!rempty),
+        .s_valid(rd_valid),
         .s_ready(skid_ready),
         .s_data (rdata_p),
         .m_valid(m_axis_tvalid),
@@ -121,6 +135,22 @@ module axis_cdc_bridge_top #(
     end
     assign st_level = {{(8-PW){1'b0}}, level_bin};
 
+    // ---------------- packet-mode bookkeeping ----------------
+    // committed packets are counted in the write domain and gray-synced to the
+    // read domain; consumed packets are counted locally in the read domain.
+    cdc_gray_counter #(.W(32)) u_commit_cnt (
+        .src_clk(aclk_m), .src_rst_n(aresetn_m), .inc(wr_en && s_axis_tlast),
+        .dst_clk(aclk_s), .dst_rst_n(aresetn_s), .dst_value(w_committed_r)
+    );
+
+    always_ff @(posedge aclk_s or negedge aresetn_s) begin
+        if (!aresetn_s) r_consumed <= '0;
+        else if (m_axis_tvalid && m_axis_tready && m_axis_tlast) r_consumed <= r_consumed + 1'b1;
+    end
+
+    cdc_sync_2ff #(.W(1)) u_sync_mode (.clk(aclk_s), .rst_n(aresetn_s), .d(cfg_mode),      .q(pkt_mode_r));
+    cdc_sync_2ff #(.W(1)) u_sync_par  (.clk(aclk_m), .rst_n(aresetn_m), .d(cfg_parity_en), .q(parity_en_m));
+
     // ---------------- event counters ----------------
     logic pkt_inc, ovf_inc;
     assign pkt_inc = m_axis_tvalid && m_axis_tready && m_axis_tlast;
@@ -137,7 +167,13 @@ module axis_cdc_bridge_top #(
     );
 
     // [31:16] overflow attempts, [15:0] parity errors (v0.3)
-    assign err_cnt = {ovf_cnt[15:0], 16'h0000};
+    cdc_gray_counter #(.W(32)) u_par_cnt (
+        .src_clk(aclk_m), .src_rst_n(aresetn_m), .inc(parity_err),
+        .dst_clk(pclk),   .dst_rst_n(presetn),   .dst_value(par_cnt)
+    );
+
+    // [31:16] overflow attempts, [15:0] parity errors
+    assign err_cnt = {ovf_cnt[15:0], par_cnt[15:0]};
 
     // ---------------- APB3 control plane ----------------
     apb3_csr_regs u_csr (

@@ -20,8 +20,11 @@ AXI4-Stream 跨时钟域（CDC）异步桥接 IP + cocotb 验证平台（v0.1 sk
 | APB3 配置寄存器（6 个，含 pslverr / W1C / pstrb） | ✅ v0.2 |
 | 运行时可编程水位阈值（AF/AE） | ✅ v0.2 |
 | 跨时钟域事件计数（包计数、溢出计数，格雷码） | ✅ v0.2 |
-| Packet 整包转发模式、奇偶校验、覆盖率收集 | ⏳ v0.3 |
-| SpyGlass CDC / SDC 约束 | ⏳ v0.4 |
+| Packet 整包转发模式（TLAST 门控 + 在途包计数） | ✅ v0.3 |
+| TUSER 奇偶校验与错误计数（ERR_CNT[15:0]） | ✅ v0.3 |
+| 36 bin 功能覆盖率（`make coverage`） | ✅ v0.3 / 36/36 |
+| SDC 约束模板（含 gray 总线的 set_max_delay / set_bus_skew） | ✅ v0.3 |
+| SpyGlass CDC 结构检查 | ⏳ v0.4 |
 
 ## 目录结构
 
@@ -52,6 +55,8 @@ pip install -r requirements.txt
 
 make sim          # 冒烟仿真，生成 dump.fst 波形
 make apb          # APB3 寄存器 / RO 保护 / W1C / 计数器测试
+make packet       # Packet 整包转发 / 奇偶校验测试
+make coverage     # 3 频比 x 2 模式 x 3 包长 x 2 tkeep = 36 bin
 make perf         # 10 万拍吞吐压测
 make regression   # 3 种频比 × 100 包
 make mutations    # 受控缺陷注入
@@ -85,13 +90,27 @@ make synth        # Yosys 综合 → reports/yosys_stat.txt
 非法地址访问、或对只读寄存器写入，`pslverr` 在 ACCESS 周期拉高（零等待 `pready`）。
 写操作支持 `pstrb` 字节选通。
 
+## 功能覆盖率
+
+`make coverage` 跑 3 组时钟频比，每组覆盖 12 个 bin，合并后 **36/36 = 100%**：
+
+| 维度 | 取值 |
+|---|---|
+| 时钟频比 | fast 10:30 / slow 30:10 / near 10:9 (ns) |
+| 转发模式 | cut-through / packet |
+| 包长类别 | short(1) / medium(3) / long(6) |
+| 字节掩码 | full(0xF) / partial(0x5) |
+
+报告：`reports/coverage_report.md`。
+
 ## 已知限制（诚实声明）
 
 - `BUG_1_BIN_SYNC`（二进制指针直接跨域）在**零延迟 RTL 仿真中不可观测**：
   Verilator 中所有比特在同一 delta 周期更新，不会产生总线偏斜。
   该缺陷需要 SDF 反标或 SpyGlass CDC 结构检查才能捕获，因此未纳入突变矩阵。
-- 当前未做 Packet 整包转发、奇偶校验、覆盖率收集、形式化与 STA（v0.3/v0.4）。
-- `CTRL[1]`（模式）与 `CTRL[2]`（奇偶校验）已接入寄存器，但数据面尚未实现对应功能。
+- 尚未做形式化验证（SymbiYosys）与真实 STA；`docs/axis_cdc_bridge.sdc` 是约束模板，未在商业工具上跑过。
+- 奇偶校验只统计错误，不丢弃错误帧；丢帧/重传属于上层协议职责。
+- `CTRL[3]` 软复位目前只产生脉冲，未接入数据面清零。
 - 综合结果基于 Yosys 通用 CMOS 映射，仅用于相对面积对比，不代表商业工艺流片面积。
 
 ## License

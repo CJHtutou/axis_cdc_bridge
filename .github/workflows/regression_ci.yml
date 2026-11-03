@@ -54,6 +54,16 @@ jobs:
           export PATH="$HOME/verilator/bin:$PATH"
           make regression
 
+      - name: Packet mode & parity tests
+        run: |
+          export PATH="$HOME/verilator/bin:$PATH"
+          make packet
+
+      - name: Functional coverage (36 bins)
+        run: |
+          export PATH="$HOME/verilator/bin:$PATH"
+          make coverage
+
       - name: Mutation testing
         run: |
           export PATH="$HOME/verilator/bin:$PATH"

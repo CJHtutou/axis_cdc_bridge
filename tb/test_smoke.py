@@ -50,6 +50,7 @@ async def init_dut(dut):
     dut.s_axis_tdata.value = 0
     dut.s_axis_tkeep.value = 0
     dut.s_axis_tlast.value = 0
+    dut.s_axis_tuser.value = 0
     dut.m_axis_tready.value = 0
     dut.aresetn_m.value = 0
     dut.aresetn_s.value = 0
@@ -87,6 +88,7 @@ async def axis_master(dut, pkts):
                 dut.s_axis_tdata.value = data
                 dut.s_axis_tkeep.value = keep
                 dut.s_axis_tlast.value = last
+                dut.s_axis_tuser.value = (bin(data).count("1") + bin(keep).count("1")) & 1
                 dut.s_axis_tvalid.value = 1
                 await Timer(MCLK_NS / 2.0 - 1.0, unit="ns")
                 accepted = int(dut.s_axis_tready.value) == 1

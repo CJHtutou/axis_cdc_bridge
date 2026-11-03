@@ -63,6 +63,7 @@ async def init(dut):
     dut.s_axis_tdata.value = 0
     dut.s_axis_tkeep.value = 0
     dut.s_axis_tlast.value = 0
+    dut.s_axis_tuser.value = 0
     dut.m_axis_tready.value = 0
 
     cocotb.start_soon(Clock(dut.aclk_m, 10, unit="ns").start())

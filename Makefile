@@ -46,6 +46,12 @@ endif
 apb:
 	$(MAKE) MODULE=test_apb TESTCASE= WAVES=0 SIM_BUILD=sim_build_apb sim
 
+packet:
+	$(MAKE) MODULE=test_packet TESTCASE= WAVES=0 SIM_BUILD=sim_build_pkt sim
+
+coverage:
+	$(PYTHON) scripts/run_coverage.py
+
 mutations:
 	$(PYTHON) scripts/run_mutations.py
 
