@@ -11,3 +11,4 @@ reports/*.csv
 reports/*.txt
 sim_build_*/
 obj_dir/
+*.smt2

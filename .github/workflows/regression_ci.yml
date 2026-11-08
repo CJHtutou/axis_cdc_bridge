@@ -73,6 +73,7 @@ jobs:
       - name: Formal proofs (z3)
         run: |
           sudo apt-get install -y z3
+          export PATH="$HOME/verilator/bin:$PATH"
           make formal
 
       - name: Mutation testing
