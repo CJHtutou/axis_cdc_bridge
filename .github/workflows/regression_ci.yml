@@ -64,6 +64,17 @@ jobs:
           export PATH="$HOME/verilator/bin:$PATH"
           make coverage
 
+      - name: Structural CDC check
+        run: |
+          sudo apt-get install -y yosys
+          export PATH="$HOME/verilator/bin:$PATH"
+          make cdc
+
+      - name: Formal proofs (z3)
+        run: |
+          sudo apt-get install -y z3
+          make formal
+
       - name: Mutation testing
         run: |
           export PATH="$HOME/verilator/bin:$PATH"

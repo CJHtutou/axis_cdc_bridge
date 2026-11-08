@@ -35,6 +35,7 @@ module apb3_csr_regs #(
     output logic        cfg_soft_rst,
     output logic [7:0]  cfg_af_th,
     output logic [7:0]  cfg_ae_th,
+    output logic        cfg_thresh_toggle,   // flips on every THRESH write
 
     output logic        irq_out
 );
@@ -94,6 +95,7 @@ module apb3_csr_regs #(
     // "clear" = remember the current value and report (live - offset).
     logic [31:0] err_off_q;
     logic        soft_rst_q;
+    logic        thresh_toggle_q;
 
     logic        wr_en;
     assign wr_en = access_q & pwrite & addr_valid & ~addr_ro;
@@ -105,6 +107,7 @@ module apb3_csr_regs #(
             irq_mask_q <= 32'h0000_000F;
             err_off_q  <= 32'h0;
             soft_rst_q <= 1'b0;
+            thresh_toggle_q <= 1'b0;
         end else begin
             soft_rst_q <= 1'b0;
             case ({wr_en, paddr})
@@ -112,7 +115,10 @@ module apb3_csr_regs #(
                     ctrl_q     <= apply_strb(ctrl_q, pwdata, pstrb);
                     soft_rst_q <= pwdata[3] & pstrb[0];
                 end
-                {1'b1, ADDR_THRESH}: thresh_q   <= apply_strb(thresh_q, pwdata, pstrb);
+                {1'b1, ADDR_THRESH}: begin
+                    thresh_q        <= apply_strb(thresh_q, pwdata, pstrb);
+                    thresh_toggle_q <= ~thresh_toggle_q;
+                end
                 {1'b1, ADDR_ERR_CNT}: begin
                     // W1C: writing 1 to a half-word clears everything counted so far
                     if (pwdata[15:0]  != 16'h0) err_off_q[15:0]  <= err_cnt[15:0];
@@ -139,6 +145,7 @@ module apb3_csr_regs #(
     assign cfg_soft_rst  = soft_rst_q;
     assign cfg_af_th     = thresh_q[7:0];
     assign cfg_ae_th     = thresh_q[15:8];
+    assign cfg_thresh_toggle = thresh_toggle_q;
 
     // ---------------- interrupt ----------------
     logic [31:0] err_vis;

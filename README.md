@@ -24,7 +24,9 @@ AXI4-Stream 跨时钟域（CDC）异步桥接 IP + cocotb 验证平台（v0.1 sk
 | TUSER 奇偶校验与错误计数（ERR_CNT[15:0]） | ✅ v0.3 |
 | 36 bin 功能覆盖率（`make coverage`） | ✅ v0.3 / 36/36 |
 | SDC 约束模板（含 gray 总线的 set_max_delay / set_bus_skew） | ✅ v0.3 |
-| SpyGlass CDC 结构检查 | ⏳ v0.4 |
+| 结构化 CDC 检查（Yosys 网表 + 自写规则，替代 SpyGlass） | ✅ v0.4 |
+| z3 形式化证明（格雷码单比特、满判断等价） | ✅ v0.4 |
+| 面试问答手卡（7 个高频追问，对应到代码） | ✅ v0.4 |
 
 ## 目录结构
 
@@ -57,6 +59,8 @@ make sim          # 冒烟仿真，生成 dump.fst 波形
 make apb          # APB3 寄存器 / RO 保护 / W1C / 计数器测试
 make packet       # Packet 整包转发 / 奇偶校验测试
 make coverage     # 3 频比 x 2 模式 x 3 包长 x 2 tkeep = 36 bin
+make cdc          # Yosys 网表结构化 CDC 检查 → reports/cdc_report.md
+make formal       # z3 形式化证明 → reports/formal_result.txt
 make perf         # 10 万拍吞吐压测
 make regression   # 3 种频比 × 100 包
 make mutations    # 受控缺陷注入
@@ -102,6 +106,16 @@ make synth        # Yosys 综合 → reports/yosys_stat.txt
 | 字节掩码 | full(0xF) / partial(0x5) |
 
 报告：`reports/coverage_report.md`。
+
+## CDC 与形式化
+
+```bash
+make cdc      # R1 时钟可解析 / R2 无未同步单比特跨域 / R3 多比特总线复核
+make formal   # yosys-smtbmc + z3 证明两条性质
+```
+
+`reports/cdc_report.md` 当前结果：62 个触发器、21 条已同步路径、0 条不安全单比特跨域；
+2 条 8 bit 阈值总线经"两相 toggle 握手"捕获，已在报告中标注。
 
 ## 已知限制（诚实声明）
 

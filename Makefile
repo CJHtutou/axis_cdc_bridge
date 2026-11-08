@@ -49,6 +49,16 @@ apb:
 packet:
 	$(MAKE) MODULE=test_packet TESTCASE= WAVES=0 SIM_BUILD=sim_build_pkt sim
 
+netlist:
+	mkdir -p reports
+	yosys -q -p "read_verilog -sv $(VERILOG_SOURCES); hierarchy -top axis_cdc_bridge_top; proc; flatten; opt_clean; write_json reports/design.json"
+
+cdc: netlist
+	$(PYTHON) scripts/cdc_lint.py
+
+formal:
+	./formal/run_formal.sh
+
 coverage:
 	$(PYTHON) scripts/run_coverage.py
 
@@ -67,3 +77,5 @@ lint:
 
 clean_all: clean
 	rm -rf sim_build __pycache__ tb/__pycache__ results.xml
+
+.PHONY: regression mutations synth lint clean_all apb packet coverage cdc netlist formal

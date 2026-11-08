@@ -48,7 +48,7 @@ module axis_cdc_bridge_top #(
     logic               wr_en, skid_ready, rd_en;
     logic [PW-1:0]      level_w;
 
-    logic               cfg_enable, cfg_mode, cfg_parity_en, cfg_soft_rst;
+    logic               cfg_enable, cfg_mode, cfg_parity_en, cfg_soft_rst, cfg_enable_m;
     logic [7:0]         cfg_af_th, cfg_ae_th;
 
     // pclk-domain status
@@ -59,9 +59,16 @@ module axis_cdc_bridge_top #(
     logic               pkt_mode_r, parity_en_m;
     logic               pkt_avail, parity_err;
 
+    // threshold update handshake: the toggle crosses as a single bit, the
+    // multi-bit threshold data is captured once it is stable in the destination
+    logic               th_toggle;
+    logic               th_t1_m, th_t2_m, th_seen_m;
+    logic               th_t1_s, th_t2_s, th_seen_s;
+    logic [7:0]         af_th_m, ae_th_s;
+
     // ---------------- data plane ----------------
-    assign wr_en         = s_axis_tvalid && !wfull && cfg_enable;
-    assign s_axis_tready = !wfull && cfg_enable;
+    assign wr_en         = s_axis_tvalid && !wfull && cfg_enable_m;
+    assign s_axis_tready = !wfull && cfg_enable_m;
     assign wdata_p       = {s_axis_tlast, s_axis_tkeep, s_axis_tdata};
 
     // parity: tuser carries the expected XOR of every tdata/tkeep bit
@@ -79,8 +86,8 @@ module axis_cdc_bridge_top #(
         .DATA_W (PW_DATA),
         .DEPTH  (DEPTH)
     ) u_fifo (
-        .af_th        (cfg_af_th),
-        .ae_th        (cfg_ae_th),
+        .af_th        (af_th_m),
+        .ae_th        (ae_th_s),
         .wclk         (aclk_m),
         .wrst_n       (aresetn_m),
         .wr_en        (wr_en),
@@ -148,13 +155,30 @@ module axis_cdc_bridge_top #(
         else if (m_axis_tvalid && m_axis_tready && m_axis_tlast) r_consumed <= r_consumed + 1'b1;
     end
 
+    cdc_sync_2ff #(.W(1)) u_sync_th_m1 (.clk(aclk_m), .rst_n(aresetn_m), .d(th_toggle), .q(th_t1_m));
+    cdc_sync_2ff #(.W(1)) u_sync_th_m2 (.clk(aclk_m), .rst_n(aresetn_m), .d(th_t1_m),   .q(th_t2_m));
+    cdc_sync_2ff #(.W(1)) u_sync_th_s1 (.clk(aclk_s), .rst_n(aresetn_s), .d(th_toggle), .q(th_t1_s));
+    cdc_sync_2ff #(.W(1)) u_sync_th_s2 (.clk(aclk_s), .rst_n(aresetn_s), .d(th_t1_s),   .q(th_t2_s));
+
+    always_ff @(posedge aclk_m or negedge aresetn_m) begin
+        if (!aresetn_m) begin af_th_m <= 8'd12; th_seen_m <= 1'b0; end
+        else if (th_t2_m != th_seen_m) begin af_th_m <= cfg_af_th; th_seen_m <= th_t2_m; end
+    end
+
+    always_ff @(posedge aclk_s or negedge aresetn_s) begin
+        if (!aresetn_s) begin ae_th_s <= 8'd4; th_seen_s <= 1'b0; end
+        else if (th_t2_s != th_seen_s) begin ae_th_s <= cfg_ae_th; th_seen_s <= th_t2_s; end
+    end
+
+    cdc_sync_2ff #(.W(1)) u_sync_en (.clk(aclk_m), .rst_n(aresetn_m), .d(cfg_enable), .q(cfg_enable_m));
+
     cdc_sync_2ff #(.W(1)) u_sync_mode (.clk(aclk_s), .rst_n(aresetn_s), .d(cfg_mode),      .q(pkt_mode_r));
     cdc_sync_2ff #(.W(1)) u_sync_par  (.clk(aclk_m), .rst_n(aresetn_m), .d(cfg_parity_en), .q(parity_en_m));
 
     // ---------------- event counters ----------------
     logic pkt_inc, ovf_inc;
     assign pkt_inc = m_axis_tvalid && m_axis_tready && m_axis_tlast;
-    assign ovf_inc = s_axis_tvalid && wfull && cfg_enable;
+    assign ovf_inc = s_axis_tvalid && wfull && cfg_enable_m;
 
     cdc_gray_counter #(.W(32)) u_pkt_cnt (
         .src_clk(aclk_s), .src_rst_n(aresetn_s), .inc(pkt_inc),
@@ -188,6 +212,7 @@ module axis_cdc_bridge_top #(
         .cfg_enable(cfg_enable), .cfg_mode(cfg_mode),
         .cfg_parity_en(cfg_parity_en), .cfg_soft_rst(cfg_soft_rst),
         .cfg_af_th(cfg_af_th), .cfg_ae_th(cfg_ae_th),
+        .cfg_thresh_toggle(th_toggle),
         .irq_out(irq_out)
     );
 
