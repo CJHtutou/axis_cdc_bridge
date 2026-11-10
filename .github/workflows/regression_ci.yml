@@ -87,6 +87,11 @@ jobs:
           export PATH="$HOME/verilator/bin:$PATH"
           make synth
 
+      - name: Area / depth sweep
+        run: |
+          export PATH="$HOME/verilator/bin:$PATH"
+          make sweep
+
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4

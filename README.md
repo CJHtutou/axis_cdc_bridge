@@ -16,7 +16,7 @@ AXI4-Stream 跨时钟域（CDC）异步桥接 IP + cocotb 验证平台（v0.1 sk
 | AXI4-Stream 从/主接口 + 2 入口 Skid Buffer | ✅ |
 | 双时钟随机反压、跨时钟域数据完整性 | ✅ 3 种频比 100% 通过 |
 | 突变测试（受控缺陷注入） | ✅ 2/2 检出 |
-| Yosys 综合与面积统计 | ✅ 1502 cells（默认 32bit / 深度 16） |
+| Yosys 综合与面积统计 | ✅ 3582 cells 合计（默认 32bit / 深度 16） |
 | APB3 配置寄存器（6 个，含 pslverr / W1C / pstrb） | ✅ v0.2 |
 | 运行时可编程水位阈值（AF/AE） | ✅ v0.2 |
 | 跨时钟域事件计数（包计数、溢出计数，格雷码） | ✅ v0.2 |
@@ -93,6 +93,18 @@ make synth        # Yosys 综合 → reports/yosys_stat.txt
 
 非法地址访问、或对只读寄存器写入，`pslverr` 在 ACCESS 周期拉高（零等待 `pready`）。
 写操作支持 `pstrb` 字节选通。
+
+## 面积-深度权衡
+
+`make sweep` 对 `DEPTH ∈ {8,16,32,64}` × `DATA_W ∈ {32,64}` 各综合一次，输出
+`reports/tradeoff_sweep.csv` 与 `reports/tradeoff_curve.png`。
+
+| DATA_W | DEPTH=8 | DEPTH=16 | DEPTH=32 | DEPTH=64 |
+|---|---|---|---|---|
+| 32 | 2909 | 3582 | 4857 | 7358 |
+| 64 | 3593 | 4842 | 7269 | 12074 |
+
+（cells 为整设计合计，含子模块；深度翻倍时面积近似线性增长，因为存储用寄存器实现）
 
 ## 功能覆盖率
 

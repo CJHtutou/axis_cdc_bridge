@@ -59,6 +59,10 @@ cdc: netlist
 formal:
 	./formal/run_formal.sh
 
+sweep:
+	mkdir -p reports
+	$(PYTHON) scripts/sweep_tradeoffs.py
+
 coverage:
 	$(PYTHON) scripts/run_coverage.py
 
